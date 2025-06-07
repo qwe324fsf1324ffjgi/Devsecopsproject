@@ -1,6 +1,4 @@
 ---
-
-````markdown
 # DevSecOps Project - Netflix Clone Deployment with CI/CD, Security, and Monitoring
 
 ## Table of Contents
