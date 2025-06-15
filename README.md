@@ -1,289 +1,245 @@
-Hey! Here's a **comprehensive and professional README.md** for this DevSecOps project. It covers setup, deployment, security, CI/CD, monitoring, Kubernetes integration, and more.
+Below is a polished **README.md** that weaves in your detailed phases into a coherent, professional document.
 
 ---
 
 ````markdown
-# DevSecOps Project - Netflix Clone Deployment with CI/CD, Security, and Monitoring
+# 🎬 Netflix Clone – Cloud CI/CD & DevSecOps Pipeline
 
-## Table of Contents
+## 🏗 Overview  
+This project delivers a **security-first CI/CD pipeline** for deploying a Netflix-clone app on AWS. It spans:
 
-- [Project Overview](#project-overview)
-- [Phase 1: Initial Setup and Deployment](#phase-1-initial-setup-and-deployment)
-- [Phase 2: Security Integration](#phase-2-security-integration)
-- [Phase 3: CI/CD Pipeline with Jenkins](#phase-3-cicd-pipeline-with-jenkins)
-- [Phase 4: Monitoring with Prometheus and Grafana](#phase-4-monitoring-with-prometheus-and-grafana)
-- [Phase 5: Notifications](#phase-5-notifications)
-- [Phase 6: Kubernetes & ArgoCD Deployment](#phase-6-kubernetes--argocd-deployment)
-- [Phase 7: Cleanup](#phase-7-cleanup)
-- [License](#license)
+- **Compute**: Two Ubuntu EC2s – one for CI/CD and security scanning, one for monitoring  
+- **CI/CD**: Jenkins automates build → test → scan → deploy  
+- **Security**: SonarQube, OWASP Dependency‑Check, Trivy  
+- **CI/CD Workflow**: Docker builds → push → ArgoCD sync → Amazon EKS  
+- **Monitoring**: Prometheus + Grafana  
+- **Notifications**: Jenkins email alerts
 
 ---
 
-## Project Overview
+## 🛠 Architecture  
 
-This project demonstrates a full DevSecOps pipeline implementation using a Netflix Clone application. The process includes application deployment on AWS EC2, securing the code with tools like SonarQube, Trivy, and Dependency-Check, and automating CI/CD with Jenkins. Additionally, we integrate Prometheus and Grafana for monitoring, and deploy to Kubernetes via ArgoCD.
+```text
+EC2 #1 (Ubuntu – CI/CD & Security)
+ ├─ Jenkins → Pipeline
+ ├─ SonarQube → Static Code Analysis
+ ├─ OWASP Dependency‑Check → SCA
+ ├─ Trivy → Container Scanning
+ └─ Docker → Image Build → DockerHub
 
----
+     ↓ DockerHub push
+ +------------------------------+
+ | ArgoCD (in EKS) auto-syncs  |
+ | → Deploys app to Kubernetes |
+ +------------------------------+
 
-## Phase 1: Initial Setup and Deployment
-
-### ✅ Launch EC2 (Ubuntu 22.04)
-
-1. Launch an EC2 instance with Ubuntu 22.04.
-2. Connect via SSH:
-   ```bash
-   ssh -i <key.pem> ubuntu@<ec2-public-ip>
+EC2 #2 (Ubuntu – Monitoring)
+ ├─ Prometheus → Scrapes Jenkins + App + Node Exporter
+ └─ Grafana → Visualizes metrics
 ````
 
-### ✅ Clone Application Repository
+---
 
-Update packages and clone the repo:
+## 🚀 Phase 1: Initial Deployment
+
+### 1. Launch EC2 (Ubuntu 22.04)
 
 ```bash
-sudo apt update -y
-sudo apt install git -y
+# SSH into your EC2 instance…
+ssh ubuntu@<YOUR_EC2_IP>
+```
+
+### 2. Clone & Build Docker App
+
+```bash
+sudo apt update
 git clone https://github.com/N4si/DevSecOps-Project.git
 cd DevSecOps-Project
-```
-
-### ✅ Install Docker & Run the App
-
-```bash
-sudo apt install docker.io -y
-sudo usermod -aG docker $USER
-newgrp docker
-sudo chmod 777 /var/run/docker.sock
-```
-
-Build and run Docker container:
-
-```bash
 docker build -t netflix .
-docker run -d --name netflix -p 8081:80 netflix:latest
+docker run -d --name netflix -p 8081:80 netflix
+# —> It will error due to missing TMDB API key
 ```
 
-App will show an error without TMDB API key.
-
-### ✅ Get TMDB API Key
-
-* Visit [TMDB](https://www.themoviedb.org/) → Login → Settings → API → Create API Key.
-
-Rebuild Docker image with your key:
+### 3. Add TMDB API Key
 
 ```bash
-docker build --build-arg TMDB_V3_API_KEY=<your-api-key> -t netflix .
+# Obtain from your TMDB account → Settings → API
+docker build --build-arg TMDB_V3_API_KEY=<YOUR_KEY> -t netflix .
+docker run -d -p 8081:80 netflix
 ```
 
 ---
 
-## Phase 2: Security Integration
+## 🔐 Phase 2: Security Scanning
 
-### ✅ SonarQube Installation
+### SonarQube
 
 ```bash
 docker run -d --name sonar -p 9000:9000 sonarqube:lts-community
+# Access: http://<EC2_IP>:9000 (admin/admin)
 ```
 
-Access: `http://<public-ip>:9000` (default login: `admin` / `admin`)
-
-### ✅ Trivy Installation
+### Trivy
 
 ```bash
 sudo apt install wget apt-transport-https gnupg lsb-release -y
 wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/trivy.list
-sudo apt update
-sudo apt install trivy -y
-```
-
-Scan Docker images:
-
-```bash
-trivy image netflix
+echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main \
+  | sudo tee /etc/apt/sources.list.d/trivy.list
+sudo apt update && sudo apt install trivy -y
+trivy image netflix:latest
 ```
 
 ---
 
-## Phase 3: CI/CD Pipeline with Jenkins
+## ⚙️ Phase 3: CI/CD with Jenkins
 
-### ✅ Jenkins Setup
-
-Install Jenkins:
+### Install Jenkins & Plugins
 
 ```bash
-sudo apt update
-sudo apt install fontconfig openjdk-17-jre -y
-java -version
+sudo apt install openjdk-17-jre -y
+wget -O jenkins.key https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key  
+echo deb ... jenkins.list
+sudo apt update && sudo apt install jenkins -y
+sudo systemctl enable --now jenkins
 ```
 
-Add Jenkins repo and install:
+* Plugins: **SonarQube Scanner**, **NodeJS**, **Dependency‑Check**, **Docker**, **Docker Pipeline**, **Email Extension**
 
-```bash
-wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
-sudo apt update
-sudo apt install jenkins -y
-sudo systemctl start jenkins
-sudo systemctl enable jenkins
-```
+### Configure Tools & Credentials
 
-Access: `http://<public-ip>:8080`
+* **Global Tools**: Set JDK17, NodeJS16, SonarQube Scanner, Dependency‑Check
+* **Credentials**: Add DockerHub secret + SonarQube token via Jenkins → Credentials
 
-### ✅ Jenkins Plugins
-
-Install via `Manage Jenkins → Plugins`:
-
-* Eclipse Temurin Installer
-* SonarQube Scanner
-* NodeJs Plugin
-* OWASP Dependency-Check
-* Docker Plugins (Commons, Pipeline, API, build-step)
-* Email Extension Plugin
-
-### ✅ Jenkins Global Tool Configuration
-
-Configure:
-
-* JDK 17
-* Node.js 16
-* SonarQube Scanner
-* Dependency-Check Tool (`DP-Check`)
-
-### ✅ Configure Credentials
-
-* Add **Sonar Token** as Secret Text
-* Add **DockerHub Credentials** (`username/password`) as Secret Text
-
----
-
-## Jenkins Pipeline (Example)
+### Sample Jenkins Pipeline (`Jenkinsfile`)
 
 ```groovy
 pipeline {
-    agent any
-    tools {
-        jdk 'jdk17'
-        nodejs 'node16'
+  agent any
+  tools { jdk 'jdk17'; nodejs 'node16' }
+  environment { SCANNER_HOME = tool 'sonar-scanner' }
+  stages {
+    stage('Checkout & Build') {
+      steps { checkout scm; sh 'npm install' }
     }
-    environment {
-        SCANNER_HOME = tool 'sonar-scanner'
+    stage('Static Analysis') {
+      steps { sh "${SCANNER_HOME}/bin/sonar-scanner" }
+      post { failure { error 'Sonar quality gate failed' } }
     }
-    stages {
-        stage('Clean Workspace') {
-            steps { cleanWs() }
+    stage('Dependency Scan')     { steps { dependencyCheckAnalyze() } }
+    stage('Container Scan')      { steps { sh 'trivy image netflix:latest' } }
+    stage('Docker Build & Push') {
+      steps {
+        script { docker.build('netflix:latest') }
+        docker.withRegistry('', 'docker') {
+          docker.image('netflix:latest').push()
         }
-        stage('Checkout') {
-            steps { git branch: 'main', url: 'https://github.com/N4si/DevSecOps-Project.git' }
-        }
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonar-server') {
-                    sh '$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Netflix -Dsonar.projectKey=Netflix'
-                }
-            }
-        }
-        stage('Quality Gate') {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
-                }
-            }
-        }
-        stage('Install Dependencies') {
-            steps { sh 'npm install' }
-        }
-        stage('OWASP Dependency Check') {
-            steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            }
-        }
-        stage('Trivy FS Scan') {
-            steps { sh 'trivy fs . > trivyfs.txt' }
-        }
-        stage('Docker Build & Push') {
-            steps {
-                script {
-                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
-                        sh 'docker build --build-arg TMDB_V3_API_KEY=<yourapikey> -t netflix .'
-                        sh 'docker tag netflix your-dockerhub-username/netflix:latest'
-                        sh 'docker push your-dockerhub-username/netflix:latest'
-                    }
-                }
-            }
-        }
-        stage('Trivy Image Scan') {
-            steps { sh 'trivy image your-dockerhub-username/netflix:latest > trivyimage.txt' }
-        }
-        stage('Deploy to Container') {
-            steps { sh 'docker run -d --name netflix -p 8081:80 your-dockerhub-username/netflix:latest' }
-        }
+      }
     }
+    stage('Deploy to EKS') {
+      steps { sh 'kubectl apply -f Kubernetes/' }
+    }
+  }
+  post {
+    always {
+      emailext(
+        subject: "Build \${currentBuild.currentResult}",
+        body: "See attached logs",
+        to: 'you@example.com',
+        attachmentsPattern: '**/trivy*.txt'
+      )
+    }
+  }
 }
 ```
 
 ---
 
-## Phase 4: Monitoring with Prometheus and Grafana
+## 📈 Phase 4: Monitoring with Prometheus & Grafana
 
-### ✅ Prometheus Installation
-
-Follow these steps:
+### Prometheus & Node Exporter
 
 ```bash
-wget https://github.com/prometheus/prometheus/releases/download/v2.47.1/prometheus-2.47.1.linux-amd64.tar.gz
-tar -xvf prometheus-2.47.1.linux-amd64.tar.gz
-# Move binaries and configs as needed, create user, set up systemd service
+# Prometheus install...
+# Node Exporter install...
+
+# Example scrape config in /etc/prometheus/prometheus.yml
+scrape_configs:
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+  - job_name: 'jenkins'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['<EC2_IP>:8080']
 ```
 
-Systemd service file: `/etc/systemd/system/prometheus.service`
-
-### ✅ Node Exporter Setup
+### Grafana Setup
 
 ```bash
-wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
-tar -xvf node_exporter-1.6.1.linux-amd64.tar.gz
-# Move binary, set up systemd
+# Install Grafana, enable service
+# Add Prometheus as data source (http://localhost:9090)
+# Import Dashboard ID 1860 to visualize metrics
 ```
-
-### ✅ Grafana Installation
-
-```bash
-sudo apt-get install -y apt-transport-https software-properties-common
-wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
-echo "deb https://packages.grafana.com/oss/deb stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
-sudo apt-get update
-sudo apt-get install grafana
-sudo systemctl enable grafana-server
-sudo systemctl start grafana-server
-```
-
-Access Grafana: `http://<server-ip>:3000` (default user: `admin`)
-
-### ✅ Add Prometheus Data Source and Dashboards
-
-* Data Source URL: `http://localhost:9090`
-* Import dashboards (e.g., ID `1860`)
 
 ---
 
-## Phase 5: Notifications
+## ⚡ Phases 5–6: Notifications & Kubernetes
 
-* Configure Jenkins Email plugin or Slack integrations.
-* Setup triggers for failure/success notifications.
+* **Phase 5**: Jenkins sends email alerts on build/success/fail (configured via `emailext`)
+* **Phase 6**:
+
+  * Create Amazon EKS cluster (node groups)
+  * Install Prometheus + Node Exporter via Helm:
+
+    ```bash
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm install pe-node-exporter prometheus-community/prometheus-node-exporter \
+      --namespace monitoring --create-namespace
+    ```
+  * Deploy Netflix clone via ArgoCD:
+
+    1. Install ArgoCD in EKS
+    2. Point to your GitHub repo + Kubernetes manifests
+    3. Configure `syncPolicy` for auto-deploy (prune + self-heal)
+    4. Expose the service (ex: NodePort 30007) -> access at `http://<NODE_IP>:30007`
 
 ---
 
-## Phase 6: Kubernetes & ArgoCD Deployment
-
-### ✅ Create Kubernetes Cluster with Node Groups
-
-* Use EKS or Minikube for local testing.
-
-### ✅ Install Node Exporter via Helm
+## 🧹 Phase 7: Cleanup
 
 ```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-kubectl create namespace prometheus-node-exporter
-helm install prometheus-node-exporter prometheus-community/prometheus-node-exporter --namespace promet
+# Terminate EC2 instances
+# Optional: delete EKS cluster
 ```
+
+---
+
+## 📝 Final Notes
+
+* This repo exemplifies **complete DevSecOps automation** on AWS using open-source tools.
+* Ideal for DevOps portfolios, and interviews—demonstrating security and best practices end-to-end.
+
+---
+
+## 📫 Contributing
+
+Fork → feature branch → PR → review
+Issues and PRs welcome!
+
+---
+
+### 👨‍💻 Author
+
+**Zerah Abba** — Cloud & DevSecOps Engineer
+📧 zerahabba1.com
+
+---
+
+⭐ Star if you find this helpful! Happy DevSecOps-ing!
+
+```
+
+---
+
+*
