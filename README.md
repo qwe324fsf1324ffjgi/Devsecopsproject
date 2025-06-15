@@ -17,10 +17,10 @@ This project delivers a **security-first CI/CD pipeline** for deploying a Netfli
 
 ---
 
-## 🛠 Architecture  
+ 🛠 Architecture  
 
-```text
-EC2 #1 (Ubuntu – CI/CD & Security)
+```
+EC2 1 (Ubuntu – CI/CD & Security)
  ├─ Jenkins → Pipeline
  ├─ SonarQube → Static Code Analysis
  ├─ OWASP Dependency‑Check → SCA
@@ -33,23 +33,23 @@ EC2 #1 (Ubuntu – CI/CD & Security)
  | → Deploys app to Kubernetes |
  +------------------------------+
 
-EC2 #2 (Ubuntu – Monitoring)
+EC2 2 (Ubuntu – Monitoring)
  ├─ Prometheus → Scrapes Jenkins + App + Node Exporter
  └─ Grafana → Visualizes metrics
 ````
 
 ---
 
-## 🚀 Phase 1: Initial Deployment
+🚀 Phase 1: Initial Deployment
 
-### 1. Launch EC2 (Ubuntu 22.04)
+ 1. Launch EC2 (Ubuntu 22.04)
 
 ```bash
-# SSH into your EC2 instance…
+ SSH into your EC2 instance…
 ssh ubuntu@<YOUR_EC2_IP>
 ```
 
-### 2. Clone & Build Docker App
+ 2. Clone & Build Docker App
 
 ```bash
 sudo apt update
@@ -57,13 +57,13 @@ git clone https://github.com/N4si/DevSecOps-Project.git
 cd DevSecOps-Project
 docker build -t netflix .
 docker run -d --name netflix -p 8081:80 netflix
-# —> It will error due to missing TMDB API key
+ —> It will error due to missing TMDB API key
 ```
 
-### 3. Add TMDB API Key
+ 3. Add TMDB API Key
 
 ```bash
-# Obtain from your TMDB account → Settings → API
+ Obtain from your TMDB account → Settings → API
 docker build --build-arg TMDB_V3_API_KEY=<YOUR_KEY> -t netflix .
 docker run -d -p 8081:80 netflix
 ```
@@ -72,14 +72,14 @@ docker run -d -p 8081:80 netflix
 
 ## 🔐 Phase 2: Security Scanning
 
-### SonarQube
+ SonarQube
 
 ```bash
 docker run -d --name sonar -p 9000:9000 sonarqube:lts-community
-# Access: http://<EC2_IP>:9000 (admin/admin)
+ Access: http://<EC2_IP>:9000 (admin/admin)
 ```
 
-### Trivy
+ Trivy
 
 ```bash
 sudo apt install wget apt-transport-https gnupg lsb-release -y
@@ -94,7 +94,7 @@ trivy image netflix:latest
 
 ## ⚙️ Phase 3: CI/CD with Jenkins
 
-### Install Jenkins & Plugins
+ Install Jenkins & Plugins
 
 ```bash
 sudo apt install openjdk-17-jre -y
@@ -106,7 +106,7 @@ sudo systemctl enable --now jenkins
 
 * Plugins: **SonarQube Scanner**, **NodeJS**, **Dependency‑Check**, **Docker**, **Docker Pipeline**, **Email Extension**
 
-### Configure Tools & Credentials
+ Configure Tools & Credentials
 
 * **Global Tools**: Set JDK17, NodeJS16, SonarQube Scanner, Dependency‑Check
 * **Credentials**: Add DockerHub secret + SonarQube token via Jenkins → Credentials
@@ -218,7 +218,7 @@ pipeline{
 
 ## 📈 Phase 4: Monitoring with Prometheus & Grafana
 
-### Prometheus & Node Exporter
+ Prometheus & Node Exporter
 
 ```bash
 # Prometheus install...
@@ -273,34 +273,9 @@ scrape_configs:
 # Terminate EC2 instances
 # Optional: delete EKS cluster
 ```
-
----
-
-## 📝 Final Notes
-
-* This repo exemplifies **complete DevSecOps automation** on AWS using open-source tools.
-* Ideal for DevOps portfolios, and interviews—demonstrating security and best practices end-to-end.
-
----
-
-## 📫 Contributing
-
-Fork → feature branch → PR → review
-Issues and PRs welcome!
-
----
-
 ### 👨‍💻 Author
 
 **Zerah Abba** — Cloud & DevSecOps Engineer
 📧 zerahabba1.com
 
----
 
-⭐ Star if you find this helpful! Happy DevSecOps-ing!
-
-```
-
----
-
-*
