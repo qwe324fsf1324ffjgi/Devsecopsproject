@@ -6,7 +6,7 @@ Below is a polished **README.md**
  🎬 Netflix Clone – Cloud CI/CD & DevSecOps Pipeline
 
  🏗 Overview  
-This project delivers a **security-first CI/CD pipeline** for deploying a Netflix-clone app on AWS. It spans:
+This project delivers a security-first CI/CD pipeline for deploying a Netflix-clone app on AWS. It spans:
 
 - Compute: Two Ubuntu EC2s – one for CI/CD and security scanning, one for monitoring  
 - CI/CD: Jenkins automates build → test → scan → deploy  
