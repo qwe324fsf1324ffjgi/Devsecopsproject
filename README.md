@@ -53,7 +53,7 @@ ssh ubuntu@<YOUR_EC2_IP>
 
 ```bash
 sudo apt update
-git clone https://github.com/N4si/DevSecOps-Project.git
+git clone https://https://github.com/qwe324fsf1324ffjgi/Devsecopsproject.git
 cd DevSecOps-Project
 docker build -t netflix .
 docker run -d --name netflix -p 8081:80 netflix
