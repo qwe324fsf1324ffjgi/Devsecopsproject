@@ -3,17 +3,17 @@ Below is a polished **README.md** that weaves in your detailed phases into a coh
 ---
 
 ````markdown
-# 🎬 Netflix Clone – Cloud CI/CD & DevSecOps Pipeline
+ 🎬 Netflix Clone – Cloud CI/CD & DevSecOps Pipeline
 
-## 🏗 Overview  
+ 🏗 Overview  
 This project delivers a **security-first CI/CD pipeline** for deploying a Netflix-clone app on AWS. It spans:
 
-- **Compute**: Two Ubuntu EC2s – one for CI/CD and security scanning, one for monitoring  
-- **CI/CD**: Jenkins automates build → test → scan → deploy  
-- **Security**: SonarQube, OWASP Dependency‑Check, Trivy  
-- **CI/CD Workflow**: Docker builds → push → ArgoCD sync → Amazon EKS  
-- **Monitoring**: Prometheus + Grafana  
-- **Notifications**: Jenkins email alerts
+- Compute: Two Ubuntu EC2s – one for CI/CD and security scanning, one for monitoring  
+- CI/CD: Jenkins automates build → test → scan → deploy  
+- Security: SonarQube, OWASP Dependency‑Check, Trivy  
+- CI/CD Workflow: Docker builds → push → ArgoCD sync → Amazon EKS  
+- Monitoring: Prometheus + Grafana  
+- Notifications: Jenkins email alerts
 
 ---
 
@@ -114,42 +114,103 @@ sudo systemctl enable --now jenkins
 ### Sample Jenkins Pipeline (`Jenkinsfile`)
 
 ```groovy
-pipeline {
-  agent any
-  tools { jdk 'jdk17'; nodejs 'node16' }
-  environment { SCANNER_HOME = tool 'sonar-scanner' }
-  stages {
-    stage('Checkout & Build') {
-      steps { checkout scm; sh 'npm install' }
+pipeline{
+    agent any
+    tools{
+        jdk 'jdk17'
+        nodejs 'node16'
     }
-    stage('Static Analysis') {
-      steps { sh "${SCANNER_HOME}/bin/sonar-scanner" }
-      post { failure { error 'Sonar quality gate failed' } }
+    environment {
+        SCANNER_HOME=tool 'sonar-scanner'
     }
-    stage('Dependency Scan')     { steps { dependencyCheckAnalyze() } }
-    stage('Container Scan')      { steps { sh 'trivy image netflix:latest' } }
-    stage('Docker Build & Push') {
-      steps {
-        script { docker.build('netflix:latest') }
-        docker.withRegistry('', 'docker') {
-          docker.image('netflix:latest').push()
+    stages {
+        stage('clean workspace'){
+            steps{
+                cleanWs()
+            }
         }
-      }
+        stage('Checkout from Git'){
+            steps{
+                git branch: 'main', url: 'https://github.com/qwe324fsf1324ffjgi/Devsecopsproject.git'
+            }
+        }
+        stage("Sonarqube Analysis "){
+            steps{
+                withSonarQubeEnv('sonar-server') {
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Netflix \
+                    -Dsonar.projectKey=Netflix '''
+                }
+            }
+        }
+        stage("quality gate"){
+           steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
+                }
+            } 
+        }
+        stage('Install Dependencies') {
+            steps {
+                sh "npm install"
+            }
+        }
+        stage('OWASP FS SCAN') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+        stage('TRIVY FS SCAN') {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
+        stage("Docker Build & Push"){
+            steps{
+                script{
+                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
+                       sh "docker build --build-arg TMDB_V3_API_KEY=<yourtmdbapikey> -t netflix ."
+                       sh "docker tag netflix zerah550/netflix:latest "
+                       sh "docker push zerah550/netflix:latest "
+                    }
+                }
+            }
+        }
+        stage("TRIVY"){
+            steps{
+                sh "trivy image zerah550/netflix:latest > trivyimage.txt" 
+            }
+        }
+        stage('Deploy to container'){
+            steps{
+                sh 'docker run -d -p 8081:80 zerah550/netflix:latest'
+            }
+        }
+        stage('Deploy to kubernets'){
+            steps{
+                script{
+                    dir('Kubernetes') {
+                        withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
+                                sh 'kubectl apply -f deployment.yml'
+                                sh 'kubectl apply -f service.yml'
+                        }   
+                    }
+                }
+            }
+        }
+
     }
-    stage('Deploy to EKS') {
-      steps { sh 'kubectl apply -f Kubernetes/' }
+    post {
+     always {
+        emailext attachLog: true,
+            subject: "'${currentBuild.result}'",
+            body: "Project: ${env.JOB_NAME}<br/>" +
+                "Build Number: ${env.BUILD_NUMBER}<br/>" +
+                "URL: ${env.BUILD_URL}<br/>",
+            to: 'zerahabba1.com',                                #change mail here
+            attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
+        }
     }
-  }
-  post {
-    always {
-      emailext(
-        subject: "Build \${currentBuild.currentResult}",
-        body: "See attached logs",
-        to: 'you@example.com',
-        attachmentsPattern: '**/trivy*.txt'
-      )
-    }
-  }
 }
 ```
 
